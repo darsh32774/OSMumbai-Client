@@ -9,7 +9,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
     <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
 
     <style>
@@ -29,12 +28,26 @@
             z-index: 10;
         }
         #map-container iframe {
-            position: fixed;
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            border: none;
+            margin: 0;
+            padding: 0;
         }
+
+        #ui-panel {
+            transition: transform 0.3s ease-in-out;
+        }
+        .panel-closed {
+            transform: translate(calc(100% + 1rem), 0) !important;
+        }
+        .panel-closed.lg\:translate-x-0 {
+            transform: translate(calc(100% + 1rem), 0) !important;
+        }
+
         .results-panel::-webkit-scrollbar {
             width: 6px;
         }
@@ -62,12 +75,15 @@
 
     <div id="map-container"></div>
 
-    <div id="ui-panel" class="w-11/12 max-w-lg fixed top-4 z-20 mx-auto left-1/2 -translate-x-1/2 lg:w-96 lg:right-4 lg:left-auto lg:translate-x-0">
+    <div id="ui-panel" class="w-11/12 max-w-lg fixed top-4 z-20 
+                 mx-auto left-1/2 -translate-x-1/2 
+                 lg:w-96 lg:right-4 lg:left-auto lg:translate-x-0">
+        
         <div class="bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5">
             <h1 class="text-2xl font-bold mb-4 text-white">OSMumbai AI Map Interface</h1>
             <p class="text-sm text-gray-300 mb-4">
                 Use natural language to query OpenStreetMap data for the Mumbai region. 
-                Powered by Gemini AI and PostGIS.
+                Powered by **Agentic AI** and PostGIS.
             </p>
             <div class="flex space-x-2">
                 <input type="text" id="query-input" placeholder="e.g., 'cafes in bandra'" 
@@ -92,7 +108,7 @@
                 <div id="table-container" class="overflow-x-auto">
                     <p id="no-results-message" class="text-gray-400">No tabular data returned.</p>
                     <table id="results-table" class="min-w-full divide-y divide-gray-700 hidden">
-                        <thead id="table-head">
+                        <thead id="table-head" class="bg-gray-700">
                         </thead>
                         <tbody id="table-body" class="divide-y divide-gray-700">
                         </tbody>
@@ -101,12 +117,75 @@
             </div>
         </div>
     </div>
+    
+    <button id="ui-toggle-button" class="fixed top-4 z-30 p-2 bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-full shadow-xl transition-all duration-300">
+        <svg id="toggle-icon" class="w-6 h-6 transform text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+    </button>
+
+    <div id="toast-message" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 rounded-lg shadow-2xl transition-opacity duration-300 opacity-0 hidden">
+    </div>
+
 
     <script>
         const SERVER_URL = "https://osmumbai.onrender.com";
-        let leafletMap; 
+        let leafletMap;
+        let isPanelOpen = true; 
+
+        function showAlert(message) {
+            const toast = document.getElementById('toast-message');
+            toast.textContent = message;
+            toast.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 rounded-lg shadow-2xl transition-opacity duration-300';
+            toast.classList.add('bg-red-600', 'text-white', 'opacity-100');
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 5000);
+        }
+
+        function setPanelState(open) {
+            const uiPanel = document.getElementById('ui-panel');
+            const toggleButton = document.getElementById('ui-toggle-button');
+            const toggleIcon = document.getElementById('toggle-icon');
+            
+            if (!uiPanel || !toggleButton) return;
+
+            if (open) {
+                uiPanel.classList.remove('panel-closed');
+                
+                // Button position for open state: left of the panel (400px = w-96 + right-4)
+                toggleButton.classList.remove('right-4', 'lg:right-4');
+                toggleButton.classList.add('lg:right-[400px]', 'right-4');
+                
+                // Icon points LEFT (to close)
+                toggleIcon.setAttribute('d', "M15 19l-7-7 7-7");
+            } else {
+                uiPanel.classList.add('panel-closed');
+                
+                // Button position for closed state: extreme right of the screen
+                toggleButton.classList.remove('lg:right-[400px]'); 
+                toggleButton.classList.add('lg:right-4', 'right-4'); 
+                
+                // Icon points RIGHT (to open)
+                toggleIcon.setAttribute('d', "M9 5l7 7-7 7"); 
+            }
+            isPanelOpen = open;
+        }
+
+        function toggleUIPanel() {
+            setPanelState(!isPanelOpen);
+        }
 
         function initMap() {
+            if (leafletMap) {
+                leafletMap.remove();
+            }
             const mapContainer = document.getElementById('map-container');
             mapContainer.innerHTML = ''; 
             
@@ -115,11 +194,80 @@
             L.tileLayer.provider('CartoDB.DarkMatter').addTo(leafletMap);
         }
 
+        function updateMapDisplay(mapHtml) {
+            const mapContainer = document.getElementById('map-container');
+            
+            if (leafletMap) {
+                leafletMap.remove();
+                leafletMap = null;
+            }
+            
+            mapContainer.innerHTML = '';
+            
+            const iframe = document.createElement('iframe');
+            
+            iframe.style.position = 'absolute';
+            iframe.style.top = '0';
+            iframe.style.left = '0';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none'; 
+            iframe.style.margin = '0';
+            iframe.style.padding = '0'; 
+
+            iframe.srcdoc = mapHtml;
+            
+            mapContainer.appendChild(iframe);
+        }
+
+        function renderTabularResults(data) {
+            const resultsCountEl = document.getElementById('results-count');
+            const resultsTable = document.getElementById('results-table');
+            const tableHead = document.getElementById('table-head');
+            const tableBody = document.getElementById('table-body');
+            const noResultsMessage = document.getElementById('no-results-message');
+
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            const rowsCount = data.rows_count || 0;
+            resultsCountEl.textContent = rowsCount;
+
+            if (rowsCount > 0 && data.headers && data.display_rows) {
+                const headerRow = document.createElement('tr');
+                data.headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.className = "px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider";
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+                tableHead.appendChild(headerRow);
+
+                data.display_rows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-700";
+                    row.forEach(cell => {
+                        const td = document.createElement('td');
+                        td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-200";
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+                
+                resultsTable.classList.remove('hidden');
+                noResultsMessage.classList.add('hidden');
+            } else {
+                resultsTable.classList.add('hidden');
+                noResultsMessage.classList.remove('hidden');
+            }
+        }
+
         async function handleSearch() {
             const queryInput = document.getElementById('query-input');
             const query = queryInput.value.trim();
             if (!query) {
-                alert("Please enter a query.");
+                showAlert("Please enter a query.");
                 return;
             }
 
@@ -127,23 +275,12 @@
             const loadingSpinner = document.getElementById('loading-spinner');
             const resultsPanel = document.getElementById('results-panel');
             const sqlQueryEl = document.getElementById('sql-query');
-            const resultsCountEl = document.getElementById('results-count');
-            const tableContainer = document.getElementById('table-container');
-            const resultsTable = document.getElementById('results-table');
-            const tableHead = document.getElementById('table-head');
-            const tableBody = document.getElementById('table-body');
-            const noResultsMessage = document.getElementById('no-results-message');
-            const mapContainer = document.getElementById('map-container');
 
             searchButton.classList.add('hidden');
             loadingSpinner.classList.remove('hidden');
             resultsPanel.classList.add('hidden');
 
-            sqlQueryEl.textContent = '';
-            tableHead.innerHTML = '';
-            tableBody.innerHTML = '';
-            resultsTable.classList.add('hidden');
-            noResultsMessage.classList.add('hidden');
+            sqlQueryEl.textContent = 'Generating SQL...';
 
             try {
                 const payload = { query: query, max_rows: 500 };
@@ -162,66 +299,22 @@
 
                 const data = await response.json();
 
-                
                 resultsPanel.classList.remove('hidden');
                 
                 sqlQueryEl.textContent = data.sql || "No SQL query returned.";
-                
-                const rowsCount = data.rows_count || 0;
-                resultsCountEl.textContent = rowsCount;
-
-                if (rowsCount > 0 && data.headers && data.display_rows) {
-                    const headerRow = document.createElement('tr');
-                    data.headers.forEach(header => {
-                        const th = document.createElement('th');
-                        th.className = "px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider";
-                        th.textContent = header;
-                        headerRow.appendChild(th);
-                    });
-                    tableHead.appendChild(headerRow);
-
-                    data.display_rows.forEach(row => {
-                        const tr = document.createElement('tr');
-                        tr.className = "hover:bg-gray-700";
-                        row.forEach(cell => {
-                            const td = document.createElement('td');
-                            td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-200";
-                            td.textContent = cell;
-                            tr.appendChild(td);
-                        });
-                        tableBody.appendChild(tr);
-                    });
-                    
-                    resultsTable.classList.remove('hidden');
-                    noResultsMessage.classList.add('hidden');
-                } else {
-                    resultsTable.classList.add('hidden');
-                    noResultsMessage.classList.remove('hidden');
-                }
 
                 if (data.map_html) {
-                    
-                    if (leafletMap) {
-                        leafletMap.remove();
-                        leafletMap = null;
-                    }
-                    
-                    mapContainer.innerHTML = '';
-                    
-                    const iframe = document.createElement('iframe');
-
-                    iframe.srcdoc = data.map_html; 
-                    
-                    mapContainer.appendChild(iframe);
+                    updateMapDisplay(data.map_html);
                 } else {
-                    if (!leafletMap) {
-                        initMap();
-                    }
+                    showAlert("No map generated. Showing initial map.");
+                    initMap();
                 }
+
+                renderTabularResults(data);
 
             } catch (error) {
                 console.error('Fetch error:', error);
-                alert(`Error fetching data: ${error.message}. Please try again.`);
+                showAlert(`Error fetching data: ${error.message}. Please check console.`);
                 if (!leafletMap) {
                     initMap();
                 }
@@ -231,18 +324,20 @@
             }
         }
 
-        
-        document.addEventListener('DOMContentLoaded', initMap);
+        document.addEventListener('DOMContentLoaded', () => {
+             initMap(); 
+             setPanelState(true); 
+        });
 
         document.getElementById('search-button').addEventListener('click', handleSearch);
-
         document.getElementById('query-input').addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 handleSearch();
             }
         });
 
+        document.getElementById('ui-toggle-button').addEventListener('click', toggleUIPanel);
+
     </script>
 </body>
 </html>
-
