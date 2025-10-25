@@ -23,8 +23,8 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            right: 0;
+            bottom: 0;
             z-index: 10;
         }
         #map-container iframe {
@@ -33,9 +33,12 @@
             left: 0;
             width: 100%;
             height: 100%;
-            border: none;
-            margin: 0;
-            padding: 0;
+            /* AGGRESSIVE RESET: Ensure no borders or gaps */
+            border: 0 !important; 
+            outline: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
         }
 
         #ui-panel {
@@ -81,14 +84,20 @@
         
         <div class="bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5">
             <h1 class="text-2xl font-bold mb-4 text-white">OSMumbai AI Map Interface</h1>
-            <p class="text-sm text-gray-300 mb-4">
+            
+            <p id="warmup-status" class="text-sm text-yellow-400 mb-4 flex items-center">
+                <span class="spinner w-4 h-4 mr-2 border-yellow-300 border-l-yellow-600"></span>
+                Warming up the server (Render free-tier cold start)...
+            </p>
+            <p id="ready-status" class="text-sm text-gray-300 mb-4 hidden">
                 Use natural language to query OpenStreetMap data for the Mumbai region. 
                 Powered by **Agentic AI** and PostGIS.
             </p>
+
             <div class="flex space-x-2">
                 <input type="text" id="query-input" placeholder="e.g., 'cafes in bandra'" 
-                       class="flex-grow bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="search-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center w-24">
+                       class="flex-grow bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                <button id="search-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center w-24 opacity-50 cursor-not-allowed" disabled>
                     Search
                 </button>
                 <div id="loading-spinner" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center w-24 hidden">
@@ -149,6 +158,46 @@
             }, 5000);
         }
 
+        function enableSearchInterface() {
+            const queryInput = document.getElementById('query-input');
+            const searchButton = document.getElementById('search-button');
+            const warmupStatus = document.getElementById('warmup-status');
+            const readyStatus = document.getElementById('ready-status');
+
+            queryInput.disabled = false;
+            searchButton.disabled = false;
+            searchButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            warmupStatus.classList.add('hidden');
+            readyStatus.classList.remove('hidden');
+            queryInput.focus(); 
+        }
+
+        async function warmUpServer() {
+            try {
+                const response = await fetch(SERVER_URL + '/', { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(120000) 
+                });
+                
+                if (response.status >= 200) {
+                     console.log("Server warmed up successfully.");
+                } else {
+                    console.warn(`Server woke up but responded with status: ${response.status}. Proceeding.`);
+                }
+                enableSearchInterface();
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.error("Warm-up request timed out after 120 seconds. Enabling search interface anyway, but be aware of possible query timeouts.");
+                    showAlert("Warning: Server is slow to wake up. Your first query might fail or take up to 2 minutes.");
+                } else {
+                    console.error("Warm-up request failed due to connection error. Enabling interface.", error);
+                    showAlert("Warning: Server connection failed during warm-up. Check server status or try searching.");
+                }
+                enableSearchInterface();
+            }
+        }
+
         function setPanelState(open) {
             const uiPanel = document.getElementById('ui-panel');
             const toggleButton = document.getElementById('ui-toggle-button');
@@ -204,7 +253,8 @@
             iframe.style.left = '0';
             iframe.style.width = '100%';
             iframe.style.height = '100%';
-            iframe.style.border = 'none'; 
+            
+            iframe.style.border = '0'; 
             iframe.style.margin = '0';
             iframe.style.padding = '0'; 
 
@@ -244,6 +294,9 @@
                         td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-200";
                         td.textContent = cell;
                         tr.appendChild(td);
+                    });
+                    tr.addEventListener('click', () => {
+                        console.log('Row clicked:', row);
                     });
                     tableBody.appendChild(tr);
                 });
@@ -286,8 +339,14 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+                    const contentType = response.headers.get("content-type");
+                    let errorDetail = `HTTP error! Status: ${response.status}`;
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                         const errorData = await response.json();
+                         errorDetail = errorData.detail || errorDetail;
+                    }
+
+                    throw new Error(errorDetail);
                 }
 
                 const data = await response.json();
@@ -307,7 +366,7 @@
 
             } catch (error) {
                 console.error('Fetch error:', error);
-                showAlert(`Error fetching data: ${error.message}. Please check console.`);
+                showAlert(`Error fetching data: ${error.message}. This is likely a timeout issue.`);
                 if (!leafletMap) {
                     initMap();
                 }
@@ -320,6 +379,7 @@
         document.addEventListener('DOMContentLoaded', () => {
              initMap(); 
              setPanelState(true); 
+             warmUpServer(); 
         });
 
         document.getElementById('search-button').addEventListener('click', handleSearch);
