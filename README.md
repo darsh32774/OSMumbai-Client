@@ -12,7 +12,7 @@ Powered by **Google Gemini AI**, the system autonomously interprets user queries
   Connects directly to the live OSMumbai backend (`https://osmumbai.onrender.com`) which uses Gemini AI to process natural language queries into SQL.
 
 - **🧩 Data Presentation**  
-  Displays query results in a https://github.com/darsh32774/OSMumbai-Client**clean, formatted table** using [`tabulate`](https://pypi.org/project/tabulate/).
+  Displays query results in a https://github.com/darsh32774/OSMumbai-Client **clean, formatted table** using [`tabulate`](https://pypi.org/project/tabulate/).
 
 - **🗺️ Interactive Map Generation**  
   Automatically saves a **Folium HTML map** locally for visualization in your browser.
