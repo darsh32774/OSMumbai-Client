@@ -119,8 +119,8 @@
     </div>
     
     <button id="ui-toggle-button" class="fixed top-4 z-30 p-2 bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-full shadow-xl transition-all duration-300">
-        <svg id="toggle-icon" class="w-6 h-6 transform text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        <svg id="toggle-icon" class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
     </button>
 
@@ -152,28 +152,21 @@
         function setPanelState(open) {
             const uiPanel = document.getElementById('ui-panel');
             const toggleButton = document.getElementById('ui-toggle-button');
-            const toggleIcon = document.getElementById('toggle-icon');
             
             if (!uiPanel || !toggleButton) return;
 
             if (open) {
                 uiPanel.classList.remove('panel-closed');
                 
-                // Button position for open state: left of the panel (400px = w-96 + right-4)
                 toggleButton.classList.remove('right-4', 'lg:right-4');
-                toggleButton.classList.add('lg:right-[400px]', 'right-4');
+                toggleButton.classList.add('lg:right-[410px]', 'right-4');
                 
-                // Icon points LEFT (to close)
-                toggleIcon.setAttribute('d', "M15 19l-7-7 7-7");
             } else {
                 uiPanel.classList.add('panel-closed');
                 
-                // Button position for closed state: extreme right of the screen
-                toggleButton.classList.remove('lg:right-[400px]'); 
+                toggleButton.classList.remove('lg:right-[410px]'); 
                 toggleButton.classList.add('lg:right-4', 'right-4'); 
                 
-                // Icon points RIGHT (to open)
-                toggleIcon.setAttribute('d', "M9 5l7 7-7 7"); 
             }
             isPanelOpen = open;
         }
