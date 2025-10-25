@@ -33,8 +33,8 @@ Powered by **Google Gemini AI**, the system autonomously interprets user queries
 
 ```bash
 # Clone the repository
-git clone https://github.com/YourUsername/OSMumbai-client.git
-cd OSMumbai-client
+git clone https://github.com/darsh32774/OSMumbai-Client.git
+cd OSMumbai-Client
 
 # Create and activate virtual environment
 python3 -m venv venv
