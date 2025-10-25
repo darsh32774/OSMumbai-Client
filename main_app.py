@@ -4,7 +4,7 @@ import sys
 import requests
 from tabulate import tabulate
 
-SERVER_URL = os.getenv("BACKEND_URL","http://localhost:8000") #set to deployed server URL
+SERVER_URL = "https://osmumbai.onrender.com"
 
 def ask_server_for_map(user_query: str, geom_key_hint: str = None, max_rows: int = 500):
     # 1. FIX: Change 'user_prompt' to 'query' to match server expectation
