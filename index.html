@@ -5,23 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSMumbai - AI Map Interface</title>
     
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Leaflet.js for initial map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- Leaflet Providers (for dark map tiles) -->
     <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
 
     <style>
-        /* Ensure the map container and iframe fill the screen */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Prevent body scrollbars */
+            overflow: hidden; 
             font-family: 'Inter', sans-serif;
         }
         #map-container {
@@ -33,22 +29,22 @@
             z-index: 10;
         }
         #map-container iframe {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            border: none;
         }
-        /* Custom scrollbar for results */
         .results-panel::-webkit-scrollbar {
             width: 6px;
         }
         .results-panel::-webkit-scrollbar-thumb {
-            background-color: #4b5563; /* gray-600 */
+            background-color: #4b5563; 
             border-radius: 3px;
         }
         .results-panel::-webkit-scrollbar-track {
-            background-color: #1f2937; /* gray-800 */
+            background-color: #1f2937; 
         }
-        /* Simple loading spinner */
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-left-color: #fff;
@@ -64,12 +60,9 @@
 </head>
 <body class="bg-gray-900 text-white">
 
-    <!-- Map Container (holds initial Leaflet map OR resulting Folium iframe) -->
     <div id="map-container"></div>
 
-    <!-- UI Panel (Floating on top) -->
     <div id="ui-panel" class="fixed top-4 right-4 z-20 w-11/12 max-w-lg">
-        <!-- Search Panel -->
         <div class="bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5">
             <h1 class="text-2xl font-bold mb-4 text-white">OSMumbai AI Map Interface</h1>
             <p class="text-sm text-gray-300 mb-4">
@@ -88,25 +81,20 @@
             </div>
         </div>
 
-        <!-- Results Panel (Initially hidden) -->
         <div id="results-panel" class="results-panel bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5 mt-4 max-h-[calc(100vh-200px)] overflow-y-auto hidden">
-            <!-- SQL Query -->
             <div>
                 <h3 class="text-lg font-semibold text-gray-200 mb-2">Generated SQL Query</h3>
                 <pre id="sql-query" class="bg-gray-900 text-green-400 p-3 rounded-md text-xs overflow-x-auto"></pre>
             </div>
             
-            <!-- Tabular Results -->
             <div class="mt-4">
                 <h3 class="text-lg font-semibold text-gray-200 mb-2">Tabular Results (<span id="results-count">0</span> found)</h3>
                 <div id="table-container" class="overflow-x-auto">
                     <p id="no-results-message" class="text-gray-400">No tabular data returned.</p>
                     <table id="results-table" class="min-w-full divide-y divide-gray-700 hidden">
                         <thead id="table-head">
-                            <!-- Headers will be injected here -->
                         </thead>
                         <tbody id="table-body" class="divide-y divide-gray-700">
-                            <!-- Rows will be injected here -->
                         </tbody>
                     </table>
                 </div>
@@ -116,22 +104,17 @@
 
     <script>
         const SERVER_URL = "https://osmumbai.onrender.com";
-        let leafletMap; // Store the initial map instance
+        let leafletMap; 
 
-        // 1. Initialize the default map on load
         function initMap() {
             const mapContainer = document.getElementById('map-container');
-            // Clear any existing content (like an old iframe)
             mapContainer.innerHTML = ''; 
             
-            // Create a new Leaflet map
-            leafletMap = L.map('map-container').setView([19.0760, 72.8777], 11); // Centered on Mumbai
+            leafletMap = L.map('map-container').setView([19.0760, 72.8777], 11);
             
-            // Use a dark map tile provider
             L.tileLayer.provider('CartoDB.DarkMatter').addTo(leafletMap);
         }
 
-        // 2. Handle the search query
         async function handleSearch() {
             const queryInput = document.getElementById('query-input');
             const query = queryInput.value.trim();
@@ -140,7 +123,6 @@
                 return;
             }
 
-            // Get UI elements
             const searchButton = document.getElementById('search-button');
             const loadingSpinner = document.getElementById('loading-spinner');
             const resultsPanel = document.getElementById('results-panel');
@@ -153,12 +135,10 @@
             const noResultsMessage = document.getElementById('no-results-message');
             const mapContainer = document.getElementById('map-container');
 
-            // Show loading state
             searchButton.classList.add('hidden');
             loadingSpinner.classList.remove('hidden');
             resultsPanel.classList.add('hidden');
 
-            // Clear previous results
             sqlQueryEl.textContent = '';
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
@@ -166,14 +146,13 @@
             noResultsMessage.classList.add('hidden');
 
             try {
-                // --- API Call (matches main_app.py logic) ---
                 const payload = { query: query, max_rows: 500 };
                 
                 const response = await fetch(`${SERVER_URL}/nl-to-map`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
-                    signal: AbortSignal.timeout(30000) // 30-second timeout
+                    signal: AbortSignal.timeout(120000) 
                 });
 
                 if (!response.ok) {
@@ -183,21 +162,15 @@
 
                 const data = await response.json();
 
-                // --- Populate Results (matches main_app.py logic) ---
                 
-                // Show the results panel
                 resultsPanel.classList.remove('hidden');
                 
-                // 1. SQL Query
                 sqlQueryEl.textContent = data.sql || "No SQL query returned.";
                 
-                // 2. Row Count
                 const rowsCount = data.rows_count || 0;
                 resultsCountEl.textContent = rowsCount;
 
-                // 3. Tabular Data
                 if (rowsCount > 0 && data.headers && data.display_rows) {
-                    // Create table headers
                     const headerRow = document.createElement('tr');
                     data.headers.forEach(header => {
                         const th = document.createElement('th');
@@ -207,7 +180,6 @@
                     });
                     tableHead.appendChild(headerRow);
 
-                    // Create table rows
                     data.display_rows.forEach(row => {
                         const tr = document.createElement('tr');
                         tr.className = "hover:bg-gray-700";
@@ -227,28 +199,21 @@
                     noResultsMessage.classList.remove('hidden');
                 }
 
-                // 4. Map HTML
                 if (data.map_html) {
-                    // This is the core logic to replace the map
                     
-                    // Destroy the Leaflet map instance if it exists
                     if (leafletMap) {
                         leafletMap.remove();
                         leafletMap = null;
                     }
                     
-                    // Clear the map container
                     mapContainer.innerHTML = '';
                     
-                    // Create an iframe to securely render the new map
                     const iframe = document.createElement('iframe');
-                    
-                    // Inject the HTML content from the API
+
                     iframe.srcdoc = data.map_html; 
                     
                     mapContainer.appendChild(iframe);
                 } else {
-                    // If no map is returned, reset to the default Mumbai map
                     if (!leafletMap) {
                         initMap();
                     }
@@ -257,26 +222,20 @@
             } catch (error) {
                 console.error('Fetch error:', error);
                 alert(`Error fetching data: ${error.message}. Please try again.`);
-                // Reset to the default map on error
                 if (!leafletMap) {
                     initMap();
                 }
             } finally {
-                // Hide loading state
                 searchButton.classList.remove('hidden');
                 loadingSpinner.classList.add('hidden');
             }
         }
 
-        // --- Event Listeners ---
         
-        // Initialize the map when the page is fully loaded
         document.addEventListener('DOMContentLoaded', initMap);
 
-        // Attach search handler to the button
         document.getElementById('search-button').addEventListener('click', handleSearch);
 
-        // Allow pressing "Enter" to search
         document.getElementById('query-input').addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 handleSearch();
