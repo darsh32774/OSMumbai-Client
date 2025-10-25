@@ -1,6 +1,6 @@
 # 🗺️ OSMumbai Client: Natural Language to Map CLI
 
-The **OSMumbai Client** is a command-line interface (CLI) for interacting with the [OSMumbai API](https://osmumbai.onrender.com) — an **Agentic AI system** that converts **natural language queries** into **PostGIS SQL** commands to fetch real-time spatial data from **Mumbai’s OpenStreetMap dataset**.
+The **OSMumbai Client** is a command-line interface (CLI) for interacting with the OSMumbai API — an **Agentic AI system** that converts **natural language queries** into **PostGIS SQL** commands to fetch real-time spatial data from **Mumbai’s OpenStreetMap dataset**.
 
 Powered by **Google Gemini AI**, the system autonomously interprets user queries like *"cafes in Bandra"* or *"fire stations in South Mumbai"*, executes them on a geospatial database, and returns both **data tables** and **interactive maps**.
 
@@ -9,10 +9,10 @@ Powered by **Google Gemini AI**, the system autonomously interprets user queries
 ## 🚀 Features
 
 - **🤖 Agentic AI Backend Integration**  
-  Connects directly to the live OSMumbai backend (`https://osmumbai.onrender.com`) which uses Gemini AI to process natural language queries into SQL.
+  Connects directly to the live OSMumbai backend which uses Gemini AI to process natural language queries into SQL.
 
 - **🧩 Data Presentation**  
-  Displays query results in a https://github.com/darsh32774/OSMumbai-Client **clean, formatted table** using [`tabulate`](https://pypi.org/project/tabulate/).
+  Displays query results in a https://github.com/darsh32774/OSMumbai-Client **clean, formatted table** using **tabulate**.
 
 - **🗺️ Interactive Map Generation**  
   Automatically saves a **Folium HTML map** locally for visualization in your browser.
@@ -133,8 +133,7 @@ SELECT name, amenity, ST_AsText(geom) FROM osm_points WHERE amenity='cafe' AND a
 ## 🧑‍💻 Author
 
 **Darsh Kukreja**  
-Engineering Student • Builder of AI-driven Geospatial Tools  
-[GitHub](https://github.com/YourUsername)
+Engineering Student 
 
 ---
 
