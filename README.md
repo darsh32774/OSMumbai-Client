@@ -1,71 +1,157 @@
-OSMumbai Client: Natural Language to Map CLI
+# 🗺️ OSMumbai Client: Natural Language to Map CLI
 
-This repository contains the command-line interface (CLI) client for the OSMumbai API, a backend service deployed on Render. This service functions as an Agentic AI system, utilizing the Gemini API to process natural language queries and autonomously translate them into structured PostGIS SQL queries for execution against Mumbai OpenStreetMap data.
+The **OSMumbai Client** is a command-line interface (CLI) for interacting with the [OSMumbai API](https://osmumbai.onrender.com) — an **Agentic AI system** that converts **natural language queries** into **PostGIS SQL** commands to fetch real-time spatial data from **Mumbai’s OpenStreetMap dataset**.
 
-HThe backend URL is hardcoded directly in main_app.py for connectivity.
+Powered by **Google Gemini AI**, the system autonomously interprets user queries like *"cafes in Bandra"* or *"fire stations in South Mumbai"*, executes them on a geospatial database, and returns both **data tables** and **interactive maps**.
 
-Features
+---
 
-API Integration: Connects directly to the live, remote backend API at https://osmumbai.onrender.com.
+## 🚀 Features
 
-Data Presentation: Displays database results in a clear, formatted table using tabulate.
+- **🤖 Agentic AI Backend Integration**  
+  Connects directly to the live OSMumbai backend (`https://osmumbai.onrender.com`) which uses Gemini AI to process natural language queries into SQL.
 
-Map Generation: Saves the returned Folium HTML map for local browser viewing.
+- **🧩 Data Presentation**  
+  Displays query results in a https://github.com/darsh32774/OSMumbai-Client**clean, formatted table** using [`tabulate`](https://pypi.org/project/tabulate/).
 
-Setup and Installation
+- **🗺️ Interactive Map Generation**  
+  Automatically saves a **Folium HTML map** locally for visualization in your browser.
 
-1. Requirements
+- **🔗 Zero Config**  
+  Backend URL is hardcoded — just run and query!
 
-The client requires a Python environment and access to the public internet.
+---
 
-2. Installation
+## ⚙️ Setup & Installation
 
-Clone the repository and install the required dependencies using pip.
+### 1. Requirements
 
-git clone [https://github.com/darsh32774/OSMumbai-Client.git](https://github.com/darsh32774/OSMumbai-Client.git)
-cd OSMumbai-Client
+- Python 3.8+  
+- Internet access (for backend API communication)
+
+### 2. Installation Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/YourUsername/OSMumbai-client.git
+cd OSMumbai-client
+
+# Create and activate virtual environment
 python3 -m venv venv
-source venv/bin/activate  # macOS/Linux
-# .\venv\Scripts\activate  # Windows
+source venv/bin/activate      # macOS/Linux
+# .\venv\Scripts\activate     # Windows
 
+# Install dependencies
 pip install -r requirements.txt
+```
 
+---
 
+## ▶️ Usage
 
-Execution
+No additional configuration is needed — the API endpoint is **predefined** in `main_app.py`.
 
-No separate configuration step is required as the API endpoint is hardcoded. Execute the main application file:
+To start the client:
 
+```bash
 python main_app.py
+```
 
+You’ll see:
 
-
-The application will prompt for natural language input:
-
+```
 ========================================
   Mumbai OSM Query (client)
 ========================================
 
-Enter your query (or 'quit' to exit): 
+Enter your query (or 'quit' to exit):
+```
 
+Type in natural language queries such as:
 
-
-Example Queries
-
+```
 hospitals near vile parle
-
 schools in andheri
-
 cafes in bandra
-
 fire stations in south mumbai
+```
 
-Output
+---
 
-A successful query returns three components:
+## 🧾 Output
 
-Generated SQL: The specific PostGIS query created by the backend.
+Each query returns **three key components**:
 
-Tabular Results: A formatted list of data points (name, area).
+1. **Generated SQL** – The backend-translated PostGIS query.  
+2. **Tabular Results** – Cleanly formatted data output (e.g., name, area).  
+3. **Map File** – An interactive HTML map (e.g., `map_cafes_in_bandra.html`) viewable in your browser.
 
-Map File: An HTML file saved locally (e.g., map_cafes_in_bandra.html) containing the interactive Folium map.
+---
+
+## 📂 Example Output
+
+```
+========================================
+Generated SQL:
+SELECT name, amenity, ST_AsText(geom) FROM osm_points WHERE amenity='cafe' AND area='Bandra';
+
+----------------------------------------
+| Name             | Amenity | Area    |
+----------------------------------------
+| Blue Tokai Cafe  | cafe    | Bandra  |
+| Starbucks        | cafe    | Bandra  |
+----------------------------------------
+
+✅ Map saved as: map_cafes_in_bandra.html
+```
+
+---
+
+## 🧠 How It Works (Under the Hood)
+
+1. User enters a **natural language query** in the CLI.  
+2. The client sends the query to the **OSMumbai backend**.  
+3. The backend (using **Gemini API + PostGIS**) converts it to an SQL query.  
+4. The backend executes the query on the **Mumbai OSM database**.  
+5. Results are sent back, displayed in the terminal, and mapped via **Folium**.
+
+---
+
+## 🏗️ Tech Stack
+
+| Component | Technology |
+|------------|-------------|
+| AI Engine | Google Gemini |
+| Backend Framework | FastAPI |
+| Database | PostgreSQL + PostGIS |
+| Client | Python (CLI) |
+| Visualization | Folium |
+| Table Formatting | Tabulate |
+
+---
+
+## 🧑‍💻 Author
+
+**Darsh Kukreja**  
+Engineering Student • Builder of AI-driven Geospatial Tools  
+[GitHub](https://github.com/YourUsername)
+
+---
+
+## 🪪 License
+
+This project is licensed under the **MIT License** — free to use, modify, and distribute with attribution.
+
+---
+
+### 💡 Example Command Summary
+
+| Command | Description |
+|----------|--------------|
+| `python main_app.py` | Launch the CLI client |
+| `quit` | Exit the program |
+| Any text query (e.g. “parks in Dadar”) | Generates results + map |
+
+---
+
+🧭 **Query Mumbai. Get Maps. Build Smarter.**
