@@ -236,7 +236,7 @@
 
             leafletMap = L.map('map-container').setView(INITIAL_COORDS, 11);
             
-            L.tileLayer.provider('CartoDB.DarkMatter').addTo(leafletMap);
+            L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(leafletMap);
         }
 
         function drawGeoJsonFeatures(geoJsonData) {
@@ -363,7 +363,7 @@
                 });
                 tableHead.appendChild(headerRow);
 
-                data.display_rows.forEach((row, index) => { // Added index for linking to GeoJSON feature
+                data.display_rows.forEach((row, index) => { 
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-gray-700 cursor-pointer";
                     row.forEach(cell => {
@@ -373,7 +373,6 @@
                         tr.appendChild(td);
                     });
                     
-                    // NEW: Add click listener to zoom to the corresponding feature
                     tr.addEventListener('click', () => {
                         console.log('Row clicked:', row);
                         if (featuresArray.length > index) {
