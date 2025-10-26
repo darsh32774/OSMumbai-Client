@@ -12,6 +12,8 @@
     <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
         html, body {
             height: 100%;
             margin: 0;
@@ -27,27 +29,11 @@
             bottom: 0;
             z-index: 10;
         }
-        #map-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            /* AGGRESSIVE RESET: Ensure no borders or gaps */
-            border: 0 !important; 
-            outline: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-sizing: border-box !important;
-        }
 
         #ui-panel {
             transition: transform 0.3s ease-in-out;
         }
         .panel-closed {
-            transform: translate(calc(100% + 1rem), 0) !important;
-        }
-        .panel-closed.lg\:translate-x-0 {
             transform: translate(calc(100% + 1rem), 0) !important;
         }
 
@@ -91,12 +77,12 @@
             </p>
             <p id="ready-status" class="text-sm text-gray-300 mb-4 hidden">
                 Use natural language to query OpenStreetMap data for the Mumbai region. 
-                Powered by **Agentic AI** and PostGIS.
+                Powered by Agentic AI and PostGIS.
             </p>
 
             <div class="flex space-x-2">
                 <input type="text" id="query-input" placeholder="e.g., 'cafes in bandra'" 
-                       class="flex-grow bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        class="flex-grow bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
                 <button id="search-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center w-24 opacity-50 cursor-not-allowed" disabled>
                     Search
                 </button>
@@ -107,15 +93,10 @@
         </div>
 
         <div id="results-panel" class="results-panel bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5 mt-4 max-h-[calc(100vh-200px)] overflow-y-auto hidden">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-200 mb-2">Generated SQL Query</h3>
-                <pre id="sql-query" class="bg-gray-900 text-green-400 p-3 rounded-md text-xs overflow-x-auto"></pre>
-            </div>
-            
             <div class="mt-4">
-                <h3 class="text-lg font-semibold text-gray-200 mb-2">Tabular Results (<span id="results-count">0</span> found)</h3>
+                <h3 class="text-lg font-semibold text-gray-200 mb-2">Results (<span id="results-count">0</span> found)</h3>
                 <div id="table-container" class="overflow-x-auto">
-                    <p id="no-results-message" class="text-gray-400">No tabular data returned.</p>
+                    <p id="no-results-message" class="text-gray-400">No data returned.</p>
                     <table id="results-table" class="min-w-full divide-y divide-gray-700 hidden">
                         <thead id="table-head" class="bg-gray-700">
                         </thead>
@@ -138,9 +119,11 @@
 
 
     <script>
-        const SERVER_URL = "https://osmumbai.onrender.com";
-        let leafletMap;
+        const SERVER_URL = "http://osmumbai.onrender.com";
+        let leafletMap = null;
+        let geoJsonLayer = null;
         let isPanelOpen = true; 
+        const INITIAL_COORDS = [19.0760, 72.8777];
 
         function showAlert(message) {
             const toast = document.getElementById('toast-message');
@@ -226,44 +209,124 @@
 
         function initMap() {
             if (leafletMap) {
-                leafletMap.remove();
+                if (geoJsonLayer) {
+                    leafletMap.removeLayer(geoJsonLayer);
+                    geoJsonLayer = null;
+                }
+                leafletMap.setView(INITIAL_COORDS, 11);
+                return;
             }
+            
             const mapContainer = document.getElementById('map-container');
             mapContainer.innerHTML = ''; 
-            
-            leafletMap = L.map('map-container').setView([19.0760, 72.8777], 11);
+
+            leafletMap = L.map('map-container').setView(INITIAL_COORDS, 11);
             
             L.tileLayer.provider('CartoDB.DarkMatter').addTo(leafletMap);
         }
 
-        function updateMapDisplay(mapHtml) {
-            const mapContainer = document.getElementById('map-container');
-            
-            if (leafletMap) {
-                leafletMap.remove();
-                leafletMap = null;
+        function drawGeoJsonFeatures(geoJsonData) {
+            if (!leafletMap) {
+                initMap();
+            }
+
+            if (geoJsonLayer) {
+                leafletMap.removeLayer(geoJsonLayer);
+                geoJsonLayer = null;
+            }
+
+            const features = geoJsonData.features || [];
+
+            if (features.length === 0) {
+                showAlert("No geometry features were found for this query.");
+                return;
             }
             
-            mapContainer.innerHTML = '';
-            
-            const iframe = document.createElement('iframe');
-            
-            iframe.style.position = 'absolute';
-            iframe.style.top = '0';
-            iframe.style.left = '0';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            
-            iframe.style.border = '0'; 
-            iframe.style.margin = '0';
-            iframe.style.padding = '0'; 
+            const style = (feature) => {
+                const geomType = feature.geometry.type;
+                let color = '#3b82f6'; 
 
-            iframe.srcdoc = mapHtml;
-            
-            mapContainer.appendChild(iframe);
+                if (geomType === 'Point' || geomType === 'MultiPoint') {
+                    color = '#10b981'; 
+                } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
+                    color = '#f59e0b'; 
+                } else {
+                    color = '#8b5cf6';
+                }
+
+                return {
+                    fillColor: color,
+                    color: color,
+                    weight: 3,
+                    opacity: 0.8,
+                    fillOpacity: 0.5
+                };
+            };
+
+            geoJsonLayer = L.geoJSON(geoJsonData, {
+                style: style,
+                pointToLayer: (feature, latlng) => {
+                    return L.circleMarker(latlng, {
+                        radius: 6,
+                        fillColor: '#10b981',
+                        color: '#059669',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    });
+                },
+                onEachFeature: (feature, layer) => {
+                    let popupContent = "<strong>Feature Details</strong><br>";
+                    if (feature.properties) {
+                        for (const key in feature.properties) {
+                            if (key.toLowerCase() !== 'geojson' && feature.properties[key]) {
+                                popupContent += `<strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> ${feature.properties[key]}<br>`;
+                            }
+                        }
+                    }
+                    layer.bindPopup(popupContent);
+                }
+            }).addTo(leafletMap);
+
+            try {
+                if (geoJsonLayer.getBounds && geoJsonLayer.getBounds().isValid()) {
+                    leafletMap.fitBounds(geoJsonLayer.getBounds(), { padding: [20, 20] });
+                } else {
+                    console.warn("GeoJSON layer bounds are invalid or empty. Keeping default zoom.");
+                }
+            } catch (e) {
+                 console.error("Error setting map bounds:", e);
+            }
+        }
+        
+        function zoomToFeature(feature) {
+            if (!leafletMap || !feature || !feature.geometry) {
+                console.warn("Cannot zoom: Map or feature geometry is missing.");
+                showAlert("Cannot zoom to feature: Missing geometry.");
+                return;
+            }
+
+            try {
+                const tempLayer = L.geoJSON(feature);
+                
+                if (tempLayer.getBounds && tempLayer.getBounds().isValid()) {
+                    leafletMap.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                } else if (feature.geometry.type.includes('Point')) {
+                    const coords = feature.geometry.coordinates;
+                    const latlng = [coords[1], coords[0]]; 
+                    leafletMap.setView(latlng, 15); 
+                } else {
+                    showAlert("Could not calculate zoom area for feature.");
+                    return;
+                }
+                
+            } catch (e) {
+                console.error("Error setting map view for feature:", e);
+                showAlert("An error occurred while zooming to the feature.");
+            }
         }
 
-        function renderTabularResults(data) {
+        function renderTabularResults(data, featuresArray) {
             const resultsCountEl = document.getElementById('results-count');
             const resultsTable = document.getElementById('results-table');
             const tableHead = document.getElementById('table-head');
@@ -286,18 +349,26 @@
                 });
                 tableHead.appendChild(headerRow);
 
-                data.display_rows.forEach(row => {
+                data.display_rows.forEach((row, index) => { 
                     const tr = document.createElement('tr');
-                    tr.className = "hover:bg-gray-700";
+                    tr.className = "hover:bg-gray-700 cursor-pointer";
                     row.forEach(cell => {
                         const td = document.createElement('td');
                         td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-200";
                         td.textContent = cell;
                         tr.appendChild(td);
                     });
+                    
                     tr.addEventListener('click', () => {
                         console.log('Row clicked:', row);
+                        if (featuresArray.length > index) {
+                            zoomToFeature(featuresArray[index]);
+                        } else {
+                            console.warn("Feature index out of bounds:", index);
+                            showAlert("Cannot find map feature for this row.");
+                        }
                     });
+                    
                     tableBody.appendChild(tr);
                 });
                 
@@ -342,8 +413,8 @@
                     const contentType = response.headers.get("content-type");
                     let errorDetail = `HTTP error! Status: ${response.status}`;
                     if (contentType && contentType.indexOf("application/json") !== -1) {
-                         const errorData = await response.json();
-                         errorDetail = errorData.detail || errorDetail;
+                        const errorData = await response.json();
+                        errorDetail = errorData.detail || errorDetail;
                     }
 
                     throw new Error(errorDetail);
@@ -354,15 +425,18 @@
                 resultsPanel.classList.remove('hidden');
                 
                 sqlQueryEl.textContent = data.sql || "No SQL query returned.";
+                
+                const geoJsonData = data.geo_json_features || data.map_html; 
 
-                if (data.map_html) {
-                    updateMapDisplay(data.map_html);
+                if (geoJsonData && geoJsonData.type === 'FeatureCollection') {
+                    drawGeoJsonFeatures(geoJsonData);
                 } else {
-                    showAlert("No map generated. Showing initial map.");
-                    initMap();
+                    showAlert("No map features found for this result. Showing initial map view.");
+                    if (!leafletMap) initMap(); 
                 }
-
-                renderTabularResults(data);
+                
+                const featuresArray = geoJsonData && geoJsonData.features ? geoJsonData.features : [];
+                renderTabularResults(data, featuresArray); 
 
             } catch (error) {
                 console.error('Fetch error:', error);
