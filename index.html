@@ -30,6 +30,10 @@
             z-index: 10;
         }
 
+        #map-container.dark-mode-map .leaflet-tile-pane {
+            filter: invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.9) saturate(0.65);
+        }
+
         #ui-panel {
             transition: transform 0.3s ease-in-out;
         }
@@ -58,6 +62,48 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #767577; 
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #3b82f6;
+        }
+        input:checked + .slider:before {
+            transform: translateX(16px);
+            background-color: #ffffff; 
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -71,6 +117,15 @@
         <div class="bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-lg shadow-xl p-5">
             <h1 class="text-2xl font-bold mb-4 text-white">OSMumbai AI Map Interface</h1>
             
+            <div class="flex justify-between items-center mb-4 p-2 bg-gray-700 rounded-md">
+                <label for="map-theme-toggle" class="text-sm font-medium text-gray-300">
+                    Map Theme: <span id="map-theme-label">Light</span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="map-theme-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
             <p id="warmup-status" class="text-sm text-yellow-400 mb-4 flex items-center">
                 <span class="spinner w-4 h-4 mr-2 border-yellow-300 border-l-yellow-600"></span>
                 Warming up the server (Render free-tier cold start)...
@@ -137,7 +192,32 @@
         let leafletMap = null;
         let geoJsonLayer = null;
         let isPanelOpen = true; 
+        let isDarkMode = false; 
         const INITIAL_COORDS = [19.0760, 72.8777]; 
+        
+        let currentHighlightedLayer = null; 
+        const featureLayerMap = new Map(); 
+
+        const defaultBlueIcon = L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        const highlightRedIcon = L.icon({
+            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            iconRetinaUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', 
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
 
         function showAlert(message) {
             const toast = document.getElementById('toast-message');
@@ -221,6 +301,28 @@
             setPanelState(!isPanelOpen);
         }
 
+        function toggleMapTheme(e) {
+            const mapContainer = document.getElementById('map-container');
+            const themeLabel = document.getElementById('map-theme-label');
+
+            const newIsDarkMode = (e && e.target) ? e.target.checked : !isDarkMode;
+            isDarkMode = newIsDarkMode;
+
+            if (isDarkMode) {
+                mapContainer.classList.add('dark-mode-map');
+                themeLabel.textContent = 'Dark';
+            } else {
+                mapContainer.classList.remove('dark-mode-map');
+                themeLabel.textContent = 'Light';
+            }
+            
+            const checkbox = document.getElementById('map-theme-toggle');
+            if (checkbox) {
+                checkbox.checked = isDarkMode;
+            }
+        }
+
+
         function initMap() {
             if (leafletMap) {
                 if (geoJsonLayer) {
@@ -237,6 +339,8 @@
             leafletMap = L.map('map-container').setView(INITIAL_COORDS, 11);
             
             L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(leafletMap);
+
+            toggleMapTheme({ target: { checked: false } }); 
         }
 
         function drawGeoJsonFeatures(geoJsonData) {
@@ -248,6 +352,9 @@
                 leafletMap.removeLayer(geoJsonLayer);
                 geoJsonLayer = null;
             }
+            
+            currentHighlightedLayer = null; 
+            featureLayerMap.clear();
 
             const features = geoJsonData.features || [];
 
@@ -261,7 +368,7 @@
                 let color = '#3b82f6'; 
 
                 if (geomType === 'Point' || geomType === 'MultiPoint') {
-                    color = '#10b981'; 
+                    color = '#3b82f6'; 
                 } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
                     color = '#f59e0b'; 
                 } else {
@@ -280,16 +387,12 @@
             geoJsonLayer = L.geoJSON(geoJsonData, {
                 style: style,
                 pointToLayer: (feature, latlng) => {
-                    return L.circleMarker(latlng, {
-                        radius: 6,
-                        fillColor: '#10b981',
-                        color: '#059669',
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.9
-                    });
+                    return L.marker(latlng, { icon: defaultBlueIcon });
                 },
                 onEachFeature: (feature, layer) => {
+                    const featureIndex = geoJsonData.features.indexOf(feature);
+                    featureLayerMap.set(featureIndex, layer);
+                    
                     let popupContent = "<strong>Feature Details</strong><br>";
                     if (feature.properties) {
                         for (const key in feature.properties) {
@@ -313,27 +416,69 @@
             }
         }
         
-        function zoomToFeature(feature) {
-            if (!leafletMap || !feature || !feature.geometry) {
-                console.warn("Cannot zoom: Map or feature geometry is missing.");
-                showAlert("Cannot zoom to feature: Missing geometry.");
+        function zoomToFeature(layer) {
+            if (!leafletMap || !layer) {
+                console.warn("Cannot zoom: Map or feature layer is missing.");
+                showAlert("Cannot zoom to feature: Missing map or layer.");
                 return;
             }
+            
+            leafletMap.invalidateSize();
 
+            if (currentHighlightedLayer && currentHighlightedLayer !== layer) {
+                if (currentHighlightedLayer.setIcon) {
+                    currentHighlightedLayer.setIcon(defaultBlueIcon);
+                } 
+            }
+
+            if (layer.setIcon) {
+                layer.setIcon(highlightRedIcon);
+            }
+            
+            currentHighlightedLayer = layer;
+            
             try {
-                const tempLayer = L.geoJSON(feature);
+                const isDesktopAndPanelOpen = isPanelOpen && window.innerWidth >= 1024;
+                const ZOOM_LEVEL = 20;
                 
-                if (tempLayer.getBounds && tempLayer.getBounds().isValid()) {
-                    leafletMap.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
-                } else if (feature.geometry.type.includes('Point')) {
-                    const coords = feature.geometry.coordinates;
-                    const latlng = [coords[1], coords[0]]; 
-                    leafletMap.setView(latlng, 15); 
+                const PANEL_WIDTH = 384; 
+
+                if (layer.getBounds && layer.getBounds().isValid()) {
+                    const boundsPadding = isDesktopAndPanelOpen ? [50, 384, 50, 50] : [50, 50]; 
+                    leafletMap.fitBounds(layer.getBounds(), { padding: boundsPadding }); 
+                } 
+                else if (layer.getLatLng) {
+                    const targetLatLng = layer.getLatLng();
+
+                    leafletMap.setView(targetLatLng, ZOOM_LEVEL, {
+                        animate: false
+                    });
+                    
+                    setTimeout(() => {
+                        if (isDesktopAndPanelOpen) {
+                            const xNudge = -(PANEL_WIDTH / 2);
+                            
+                            leafletMap.panBy([xNudge, 0], { 
+                                animate: true, 
+                                duration: 0.5 
+                            });
+                        }
+                        
+                        if (layer.getPopup && layer.getPopup()) {
+                             layer.openPopup();
+                        }
+                    }, 50); 
+
+                    return; 
                 } else {
                     showAlert("Could not calculate zoom area for feature.");
                     return;
                 }
                 
+                if (layer.getPopup && layer.getPopup()) {
+                     layer.openPopup();
+                }
+
             } catch (e) {
                 console.error("Error setting map view for feature:", e);
                 showAlert("An error occurred while zooming to the feature.");
@@ -374,11 +519,12 @@
                     });
                     
                     tr.addEventListener('click', () => {
-                        console.log('Row clicked:', row);
-                        if (featuresArray.length > index) {
-                            zoomToFeature(featuresArray[index]);
+                        const layerToZoom = featureLayerMap.get(index); 
+                        
+                        if (layerToZoom) {
+                            zoomToFeature(layerToZoom);
                         } else {
-                            console.warn("Feature index out of bounds:", index);
+                            console.warn("Feature index out of bounds or layer not found:", index);
                             showAlert("Cannot find map feature for this row.");
                         }
                     });
@@ -506,6 +652,8 @@
         });
 
         document.getElementById('ui-toggle-button').addEventListener('click', toggleUIPanel);
+        
+        document.getElementById('map-theme-toggle').addEventListener('change', toggleMapTheme);
         
         const toggleSqlButton = document.getElementById('toggle-sql-button');
         if (toggleSqlButton) {
