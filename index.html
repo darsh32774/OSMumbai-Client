@@ -6,15 +6,14 @@
     <title>OSMumbai - AI Map Interface</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
-        :root{
+        :root {
             --ui-gap: 16px;
             --panel-max-width: 32rem; 
         }
@@ -33,10 +32,6 @@
             z-index: 10;
         }
 
-        #map-container.dark-mode-map .leaflet-tile-pane {
-            filter: invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.9) saturate(0.65);
-        }
-
         #ui-panel {
             transition: transform 0.3s ease-in-out;
             will-change: transform;
@@ -45,28 +40,19 @@
             transform: translateX(calc(100% + var(--ui-gap))) !important;
         }
 
-        .results-panel::-webkit-scrollbar {
-            width: 6px;
-        }
-        .results-panel::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 3px;
-        }
-        .results-panel::-webkit-scrollbar-track {
-            background-color: #1f2937;
-        }
+        .results-panel::-webkit-scrollbar { width: 6px; }
+        .results-panel::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 3px; }
+        .results-panel::-webkit-scrollbar-track { background-color: #1f2937; }
 
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
+            border: 4px solid rgba(255,255,255,0.3);
             border-left-color: #fff;
             border-radius: 50%;
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .switch {
             position: relative;
@@ -74,11 +60,7 @@
             width: 36px;
             height: 20px;
         }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
             position: absolute;
             cursor: pointer;
@@ -98,42 +80,49 @@
             transition: .4s;
             border-radius: 50%;
         }
-        input:checked + .slider {
-            background-color: #3b82f6;
-        }
-        input:checked + .slider:before {
-            transform: translateX(16px);
-            background-color: #ffffff;
-        }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(16px); background-color: #ffffff; }
 
-        #ui-panel {
-            padding-top: env(safe-area-inset-top);
-        }
+        #ui-panel { padding-top: env(safe-area-inset-top); }
 
         @media (max-width: 1023px) {
             #ui-panel {
                 width: min(92vw, var(--panel-max-width));
                 top: calc(12px + env(safe-area-inset-top));
             }
-
-            #results-panel {
-                max-height: calc(100vh - 220px - env(safe-area-inset-top));
-            }
+            #results-panel { max-height: calc(100vh - 220px - env(safe-area-inset-top)); }
         }
-
         @media (min-width: 1024px) {
             #ui-panel {
-                width: 24rem; 
+                width: 24rem;
                 top: 16px;
                 right: 16px;
                 left: auto;
                 transform: none;
             }
-
-            #results-panel {
-                max-height: calc(100vh - 200px);
-            }
+            #results-panel { max-height: calc(100vh - 200px); }
         }
+
+        .maplibregl-popup-content {
+            background: #1f2937;
+            color: #e5e7eb;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.78rem;
+            line-height: 1.6;
+            max-width: 220px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .maplibregl-popup-tip { border-top-color: #1f2937 !important; }
+        .maplibregl-popup-close-button { color: #9ca3af; font-size: 16px; padding: 4px 8px; }
+        .maplibregl-popup-close-button:hover { color: #e5e7eb; background: none; }
+        .maplibregl-ctrl-group { background: #1f2937 !important; border: 1px solid #374151 !important; }
+        .maplibregl-ctrl-group button { background-color: #1f2937 !important; }
+        .maplibregl-ctrl-icon { filter: invert(0.8); }
+        .maplibregl-ctrl-attrib { background: rgba(31,41,55,0.8) !important; color: #9ca3af !important; font-size: 10px; }
+        .maplibregl-ctrl-attrib a { color: #60a5fa !important; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -156,6 +145,7 @@
                     <span class="slider"></span>
                 </label>
             </div>
+
             <p id="warmup-status" class="text-sm text-yellow-400 mb-4 flex items-center">
                 <span class="spinner w-4 h-4 mr-2 border-yellow-300 border-l-yellow-600"></span>
                 Warming up the server (Render free-tier cold start)...
@@ -186,7 +176,6 @@
                         Show Query
                     </button>
                 </div>
-                
                 <div id="sql-content-wrapper" class="hidden">
                     <pre id="sql-query" class="bg-gray-900 text-green-400 p-3 rounded-md text-xs whitespace-pre-wrap"></pre>
                 </div>
@@ -197,10 +186,8 @@
                 <div id="table-container" class="overflow-x-auto">
                     <p id="no-results-message" class="text-gray-400">No data returned.</p>
                     <table id="results-table" class="min-w-full divide-y divide-gray-700 hidden">
-                        <thead id="table-head" class="bg-gray-700">
-                        </thead>
-                        <tbody id="table-body" class="divide-y divide-gray-700">
-                        </tbody>
+                        <thead id="table-head" class="bg-gray-700"></thead>
+                        <tbody id="table-body" class="divide-y divide-gray-700"></tbody>
                     </table>
                 </div>
             </div>
@@ -208,45 +195,33 @@
     </div>
     
     <button id="ui-toggle-button" class="fixed top-4 z-30 p-2 bg-gray-800 bg-opacity-80 backdrop-blur-md rounded-full shadow-xl transition-all duration-300">
-        <svg id="toggle-icon" class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg id="toggle-icon" class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
     </button>
 
-    <div id="toast-message" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 rounded-lg shadow-2xl transition-opacity duration-300 opacity-0 hidden">
-    </div>
-
+    <div id="toast-message" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 rounded-lg shadow-2xl transition-opacity duration-300 opacity-0 hidden"></div>
 
     <script>
-        const SERVER_URL = "https://osmumbai-server.onrender.com";
-        let leafletMap = null;
-        let geoJsonLayer = null;
-        let isPanelOpen = true; 
-        let isDarkMode = false; 
-        const INITIAL_COORDS = [19.0760, 72.8777]; 
-        
-        let currentHighlightedLayer = null; 
-        const featureLayerMap = new Map(); 
+        const MAPTILER_KEY   = 'yBe4StW0eUtl8xuEUmSE';
+        const SERVER_URL     = "https://osmumbai-server.vercel.app";
+        const INITIAL_CENTER = [72.8777, 19.0760];
+        const INITIAL_ZOOM   = 10;
 
-        const defaultBlueIcon = L.icon({
-            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+        const STYLE_LIGHT = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
+        const STYLE_DARK  = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`;
 
-        const highlightRedIcon = L.icon({
-            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            iconRetinaUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', 
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+        let mapInstance          = null;
+        let currentGeoJson       = null;
+        let isPanelOpen          = true;
+        let isDarkMode           = false;
+        let isSqlVisible         = false;
+        let currentHighlightedId = null;
+
+        const COLOR_POINT   = '#3b82f6';
+        const COLOR_LINE    = '#f59e0b';
+        const COLOR_POLYGON = '#8b5cf6';
+        const COLOR_HL      = '#ef4444';
 
         function showAlert(message) {
             const toast = document.getElementById('toast-message');
@@ -254,409 +229,402 @@
             toast.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 rounded-lg shadow-2xl transition-opacity duration-300';
             toast.classList.add('bg-red-600', 'text-white', 'opacity-100');
             toast.classList.remove('hidden');
-
             setTimeout(() => {
                 toast.classList.remove('opacity-100');
                 toast.classList.add('opacity-0');
-                setTimeout(() => {
-                    toast.classList.add('hidden');
-                }, 300);
+                setTimeout(() => toast.classList.add('hidden'), 300);
             }, 5000);
         }
 
         function enableSearchInterface() {
-            const queryInput = document.getElementById('query-input');
-            const searchButton = document.getElementById('search-button');
-            const warmupStatus = document.getElementById('warmup-status');
-            const readyStatus = document.getElementById('ready-status');
-
-            queryInput.disabled = false;
-            searchButton.disabled = false;
-            searchButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            warmupStatus.classList.add('hidden');
-            readyStatus.classList.remove('hidden');
-            queryInput.focus(); 
+            const inp = document.getElementById('query-input');
+            const btn = document.getElementById('search-button');
+            inp.disabled = false;
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('warmup-status').classList.add('hidden');
+            document.getElementById('ready-status').classList.remove('hidden');
+            inp.focus();
         }
 
         async function warmUpServer() {
             try {
-                const response = await fetch(SERVER_URL + '/', { 
+                const res = await fetch(SERVER_URL + '/', {
                     method: 'GET',
-                    signal: AbortSignal.timeout(120000) 
+                    signal: AbortSignal.timeout(120000)
                 });
-                
-                if (response.status >= 200) {
-                     console.log("Server warmed up successfully.");
+                if (res.status < 200) throw new Error(`Status ${res.status}`);
+                console.log("Server warmed up.");
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    showAlert("Warning: Server is slow to wake up. Your first query might take up to 2 minutes.");
                 } else {
-                    console.warn(`Server woke up but responded with status: ${response.status}. Proceeding.`);
+                    showAlert("Warning: Server connection failed during warm-up. Try searching anyway.");
                 }
-                enableSearchInterface();
-                
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    console.error("Warm-up request timed out after 120 seconds. Enabling search interface anyway, but be aware of possible query timeouts.");
-                    showAlert("Warning: Server is slow to wake up. Your first query might fail or take up to 2 minutes.");
-                } else {
-                    console.error("Warm-up request failed due to connection error. Enabling interface.", error);
-                    showAlert("Warning: Server connection failed during warm-up. Check server status or try searching.");
-                }
+            } finally {
                 enableSearchInterface();
             }
         }
 
         function positionToggleButton() {
-            const uiPanel = document.getElementById('ui-panel');
-            const toggleButton = document.getElementById('ui-toggle-button');
-
-            if (!uiPanel || !toggleButton) return;
+            const panel = document.getElementById('ui-panel');
+            const btn   = document.getElementById('ui-toggle-button');
+            if (!panel || !btn) return;
 
             const isDesktop = window.innerWidth >= 1024;
-
             if (!isDesktop) {
-                toggleButton.style.right = '16px';
-                toggleButton.style.left = 'auto';
+                btn.style.right = '16px';
+                btn.style.left  = 'auto';
                 return;
             }
-
             if (isPanelOpen) {
-                const panelRect = uiPanel.getBoundingClientRect();
-                const x = Math.max(16, window.innerWidth - panelRect.right + 16 + panelRect.width + 16);
-                toggleButton.style.right = (window.innerWidth - panelRect.left + 16) + 'px';
-                toggleButton.style.left = 'auto';
+                const rect = panel.getBoundingClientRect();
+                btn.style.right = (window.innerWidth - rect.left + 16) + 'px';
+                btn.style.left  = 'auto';
             } else {
-                toggleButton.style.right = '16px';
-                toggleButton.style.left = 'auto';
+                btn.style.right = '16px';
+                btn.style.left  = 'auto';
             }
         }
 
         function setPanelState(open) {
-            const uiPanel = document.getElementById('ui-panel');
-            if (!uiPanel) return;
+            const panel = document.getElementById('ui-panel');
+            if (!panel) return;
 
-            if (open) uiPanel.classList.remove('panel-closed');
-            else uiPanel.classList.add('panel-closed');
+            if (open) panel.classList.remove('panel-closed');
+            else panel.classList.add('panel-closed');
 
             isPanelOpen = open;
-            positionToggleButton();
+
+            const handler = () => {
+                positionToggleButton();
+                panel.removeEventListener('transitionend', handler);
+            };
+
+            panel.addEventListener('transitionend', handler);
         }
 
-        function toggleUIPanel() {
-            setPanelState(!isPanelOpen);
+        function toggleUIPanel() { setPanelState(!isPanelOpen); }
+
+        function initMap() {
+            if (mapInstance) return;
+            mapInstance = new maplibregl.Map({
+                container: 'map-container',
+                style: STYLE_LIGHT,
+                center: INITIAL_CENTER,
+                zoom: INITIAL_ZOOM
+            });
+            mapInstance.addControl(new maplibregl.NavigationControl(), 'bottom-right');
         }
 
         function toggleMapTheme(e) {
-            const mapContainer = document.getElementById('map-container');
-            const themeLabel = document.getElementById('map-theme-label');
+            isDarkMode = e && e.target ? e.target.checked : !isDarkMode;
+            document.getElementById('map-theme-label').textContent = isDarkMode ? 'Dark' : 'Light';
+            const cb = document.getElementById('map-theme-toggle');
+            if (cb) cb.checked = isDarkMode;
 
-            const newIsDarkMode = (e && e.target) ? e.target.checked : !isDarkMode;
-            isDarkMode = newIsDarkMode;
+            if (!mapInstance) return;
 
-            if (isDarkMode) {
-                mapContainer.classList.add('dark-mode-map');
-                themeLabel.textContent = 'Dark';
-            } else {
-                mapContainer.classList.remove('dark-mode-map');
-                themeLabel.textContent = 'Light';
-            }
-            
-            const checkbox = document.getElementById('map-theme-toggle');
-            if (checkbox) checkbox.checked = isDarkMode;
+            const savedGeoJson = currentGeoJson;
+            mapInstance.setStyle(isDarkMode ? STYLE_DARK : STYLE_LIGHT);
+            mapInstance.once('styledata', () => {
+                if (savedGeoJson) addLayers(savedGeoJson);
+            });
         }
 
-        function initMap() {
-            if (leafletMap) {
-                if (geoJsonLayer) {
-                    leafletMap.removeLayer(geoJsonLayer);
-                    geoJsonLayer = null;
+        function buildPopupHtml(properties) {
+            if (!properties) return '<em style="color:#9ca3af">No properties</em>';
+            let html = '<strong>Feature Details</strong><br>';
+            for (const k in properties) {
+                if (k.toLowerCase() !== 'geojson' && properties[k]) {
+                    html += `<strong>${k.replace(/_/g,' ').toUpperCase()}:</strong> ${properties[k]}<br>`;
                 }
-                leafletMap.setView(INITIAL_COORDS, 11);
-                return;
             }
-            
-            const mapContainer = document.getElementById('map-container');
-            mapContainer.innerHTML = ''; 
+            return html;
+        }
 
-            leafletMap = L.map('map-container').setView(INITIAL_COORDS, 11);
-            L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(leafletMap);
+        function removeLayers() {
+            if (!mapInstance) return;
+            ['query-points', 'query-lines', 'query-polygons', 'query-polygons-outline'].forEach(id => {
+                if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+            });
+            if (mapInstance.getSource('query-results')) mapInstance.removeSource('query-results');
+        }
 
-            toggleMapTheme({ target: { checked: false } }); 
+        function addLayers(geoJsonData) {
+            if (!mapInstance) return;
+            removeLayers();
+
+            const data = JSON.parse(JSON.stringify(geoJsonData));
+            data.features.forEach((f, i) => { f.id = i; });
+
+            mapInstance.addSource('query-results', { type: 'geojson', data });
+
+            mapInstance.addLayer({
+                id: 'query-polygons', type: 'fill', source: 'query-results',
+                filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
+                paint: {
+                    'fill-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], COLOR_HL, COLOR_POLYGON],
+                    'fill-opacity': 0.4
+                }
+            });
+
+            mapInstance.addLayer({
+                id: 'query-polygons-outline', type: 'line', source: 'query-results',
+                filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
+                paint: {
+                    'line-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], COLOR_HL, COLOR_POLYGON],
+                    'line-width': 2.5,
+                    'line-opacity': 0.85
+                }
+            });
+
+            mapInstance.addLayer({
+                id: 'query-lines', type: 'line', source: 'query-results',
+                filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+                paint: {
+                    'line-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], COLOR_HL, COLOR_LINE],
+                    'line-width': 3,
+                    'line-opacity': 0.85
+                }
+            });
+
+            mapInstance.addLayer({
+                id: 'query-points', type: 'circle', source: 'query-results',
+                filter: ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
+                paint: {
+                    'circle-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], COLOR_HL, COLOR_POINT],
+                    'circle-radius': 7,
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-opacity': 0.9
+                }
+            });
+
+            ['query-points', 'query-lines', 'query-polygons'].forEach(layerId => {
+                mapInstance.on('click', layerId, (e) => {
+                    const feature = e.features?.[0];
+                    if (!feature) return;
+                    const lngLat = feature.geometry.type === 'Point'
+                        ? { lng: feature.geometry.coordinates[0], lat: feature.geometry.coordinates[1] }
+                        : e.lngLat;
+                    new maplibregl.Popup({ offset: 10 })
+                        .setLngLat(lngLat)
+                        .setHTML(buildPopupHtml(feature.properties))
+                        .addTo(mapInstance);
+                });
+                mapInstance.on('mouseenter', layerId, () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
+                mapInstance.on('mouseleave', layerId, () => { mapInstance.getCanvas().style.cursor = ''; });
+            });
+        }
+
+        function featureBounds(feature) {
+            const bounds = new maplibregl.LngLatBounds();
+            const geom   = feature.geometry;
+            if (!geom) return null;
+
+            const ext = c => bounds.extend(c);
+
+            if      (geom.type === 'Point')           ext(geom.coordinates);
+            else if (geom.type === 'MultiPoint')      geom.coordinates.forEach(ext);
+            else if (geom.type === 'LineString')      geom.coordinates.forEach(ext);
+            else if (geom.type === 'MultiLineString') geom.coordinates.forEach(l => l.forEach(ext));
+            else if (geom.type === 'Polygon')         geom.coordinates[0].forEach(ext);
+            else if (geom.type === 'MultiPolygon')    geom.coordinates.forEach(p => p[0].forEach(ext));
+
+            return bounds.isEmpty() ? null : bounds;
         }
 
         function drawGeoJsonFeatures(geoJsonData) {
-            if (!leafletMap) initMap();
-
-            if (geoJsonLayer) {
-                leafletMap.removeLayer(geoJsonLayer);
-                geoJsonLayer = null;
-            }
-            
-            currentHighlightedLayer = null; 
-            featureLayerMap.clear();
+            if (!mapInstance) return;
+            currentGeoJson       = geoJsonData;
+            currentHighlightedId = null;
 
             const features = geoJsonData.features || [];
-            if (features.length === 0) {
-                showAlert("No geometry features were found for this query.");
-                return;
+            if (!features.length) { showAlert("No geometry features were found for this query."); return; }
+
+            if (!mapInstance.isStyleLoaded()) {
+                mapInstance.once('styledata', () => addLayers(geoJsonData));
+            } else {
+                addLayers(geoJsonData);
             }
-            
-            const style = (feature) => {
-                const geomType = feature.geometry.type;
-                let color = '#3b82f6'; 
-
-                if (geomType === 'Point' || geomType === 'MultiPoint') color = '#3b82f6';
-                else if (geomType === 'LineString' || geomType === 'MultiLineString') color = '#f59e0b';
-                else color = '#8b5cf6';
-
-                return {
-                    fillColor: color,
-                    color: color,
-                    weight: 3,
-                    opacity: 0.8,
-                    fillOpacity: 0.5
-                };
-            };
-
-            geoJsonLayer = L.geoJSON(geoJsonData, {
-                style: style,
-                pointToLayer: (feature, latlng) => L.marker(latlng, { icon: defaultBlueIcon }),
-                onEachFeature: (feature, layer) => {
-                    const featureIndex = geoJsonData.features.indexOf(feature);
-                    featureLayerMap.set(featureIndex, layer);
-                    
-                    let popupContent = "<strong>Feature Details</strong><br>";
-                    if (feature.properties) {
-                        for (const key in feature.properties) {
-                            if (key.toLowerCase() !== 'geojson' && feature.properties[key]) {
-                                popupContent += `<strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> ${feature.properties[key]}<br>`;
-                            }
-                        }
-                    }
-                    layer.bindPopup(popupContent);
-                }
-            }).addTo(leafletMap);
 
             try {
-                if (geoJsonLayer.getBounds && geoJsonLayer.getBounds().isValid()) {
-                    leafletMap.fitBounds(geoJsonLayer.getBounds(), { padding: [20, 20] });
-                }
-            } catch (e) {
-                 console.error("Error setting map bounds:", e);
-            }
+                const all = new maplibregl.LngLatBounds();
+                features.forEach(f => {
+                    const b = featureBounds(f);
+                    if (b) { all.extend(b.getSouthWest()); all.extend(b.getNorthEast()); }
+                });
+                if (!all.isEmpty()) mapInstance.fitBounds(all, { padding: 40, maxZoom: 16 });
+            } catch(e) { console.error("fitBounds error:", e); }
         }
-        
-        function zoomToFeature(layer) {
-            if (!leafletMap || !layer) {
-                showAlert("Cannot zoom to feature: Missing map or layer.");
+
+        function zoomToFeature(featureIndex) {
+            if (!mapInstance || !currentGeoJson) return;
+            const feature = currentGeoJson.features[featureIndex];
+            if (!feature) { showAlert("Cannot find map feature for this row."); return; }
+
+            if (currentHighlightedId !== null) {
+                try { mapInstance.setFeatureState({ source: 'query-results', id: currentHighlightedId }, { highlighted: false }); } catch(_) {}
+            }
+            try { mapInstance.setFeatureState({ source: 'query-results', id: featureIndex }, { highlighted: true }); } catch(_) {}
+            currentHighlightedId = featureIndex;
+
+            const bounds       = featureBounds(feature);
+            const isDesktopOpen = isPanelOpen && window.innerWidth >= 1024;
+            const panelW       = document.getElementById('ui-panel')?.getBoundingClientRect().width || 384;
+
+            if (feature.geometry?.type === 'Point') {
+                const coords = feature.geometry.coordinates;
+                mapInstance.flyTo({
+                    center: [coords[0], coords[1]],
+                    zoom: 17,
+                    offset: isDesktopOpen ? [-(panelW / 2), 0] : [0, 0],
+                    duration: 800
+                });
+                new maplibregl.Popup({ offset: 10 })
+                    .setLngLat([coords[0], coords[1]])
+                    .setHTML(buildPopupHtml(feature.properties))
+                    .addTo(mapInstance);
                 return;
             }
-            
-            leafletMap.invalidateSize();
 
-            if (currentHighlightedLayer && currentHighlightedLayer !== layer) {
-                if (currentHighlightedLayer.setIcon) currentHighlightedLayer.setIcon(defaultBlueIcon);
-            }
-
-            if (layer.setIcon) layer.setIcon(highlightRedIcon);
-            currentHighlightedLayer = layer;
-            
-            try {
-                const isDesktopAndPanelOpen = isPanelOpen && window.innerWidth >= 1024;
-                const ZOOM_LEVEL = 17;
-
-                const panelEl = document.getElementById('ui-panel');
-                const panelWidth = panelEl ? panelEl.getBoundingClientRect().width : 384;
-
-                if (layer.getBounds && layer.getBounds().isValid()) {
-                    const boundsPadding = isDesktopAndPanelOpen ? [50, panelWidth + 24, 50, 50] : [50, 50];
-                    leafletMap.fitBounds(layer.getBounds(), { padding: boundsPadding });
-                } 
-                else if (layer.getLatLng) {
-                    const targetLatLng = layer.getLatLng();
-                    leafletMap.setView(targetLatLng, ZOOM_LEVEL, { animate: false });
-                    
-                    setTimeout(() => {
-                        if (isDesktopAndPanelOpen) {
-                            const xNudge = -(panelWidth / 2);
-                            leafletMap.panBy([xNudge, 0], { animate: true, duration: 0.5 });
-                        }
-                        if (layer.getPopup && layer.getPopup()) layer.openPopup();
-                    }, 50);
-                    return;
-                } else {
-                    showAlert("Could not calculate zoom area for feature.");
-                    return;
-                }
-                
-                if (layer.getPopup && layer.getPopup()) layer.openPopup();
-            } catch (e) {
-                console.error("Error setting map view for feature:", e);
-                showAlert("An error occurred while zooming to the feature.");
+            if (bounds) {
+                const pad = isDesktopOpen
+                    ? { top: 60, right: 60, bottom: 60, left: panelW + 30 }
+                    : 60;
+                mapInstance.fitBounds(bounds, { padding: pad, maxZoom: 17, duration: 800 });
             }
         }
 
         function renderTabularResults(data) {
-            const resultsCountEl = document.getElementById('results-count');
-            const resultsTable = document.getElementById('results-table');
-            const tableHead = document.getElementById('table-head');
-            const tableBody = document.getElementById('table-body');
-            const noResultsMessage = document.getElementById('no-results-message');
+            const countEl = document.getElementById('results-count');
+            const thead   = document.getElementById('table-head');
+            const tbody   = document.getElementById('table-body');
+            const table   = document.getElementById('results-table');
+            const noMsg   = document.getElementById('no-results-message');
 
-            tableHead.innerHTML = '';
-            tableBody.innerHTML = '';
+            thead.innerHTML = ''; tbody.innerHTML = '';
+            const n = data.rows_count || 0;
+            countEl.textContent = n;
 
-            const rowsCount = data.rows_count || 0;
-            resultsCountEl.textContent = rowsCount;
-
-            if (rowsCount > 0 && data.headers && data.display_rows) {
-                const headerRow = document.createElement('tr');
-                data.headers.forEach(header => {
+            if (n > 0 && data.headers && data.display_rows) {
+                const hr = document.createElement('tr');
+                data.headers.forEach(h => {
                     const th = document.createElement('th');
                     th.className = "px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider";
-                    th.textContent = header;
-                    headerRow.appendChild(th);
+                    th.textContent = h;
+                    hr.appendChild(th);
                 });
-                tableHead.appendChild(headerRow);
+                thead.appendChild(hr);
 
-                data.display_rows.forEach((row, index) => { 
+                data.display_rows.forEach((row, index) => {
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-gray-700 cursor-pointer";
                     row.forEach(cell => {
                         const td = document.createElement('td');
                         td.className = "px-4 py-2 whitespace-nowrap text-sm text-gray-200";
-                        td.textContent = cell;
+                        td.textContent = cell ?? '';
                         tr.appendChild(td);
                     });
-                    
-                    tr.addEventListener('click', () => {
-                        const layerToZoom = featureLayerMap.get(index); 
-                        if (layerToZoom) zoomToFeature(layerToZoom);
-                        else showAlert("Cannot find map feature for this row.");
-                    });
-                    
-                    tableBody.appendChild(tr);
+                    tr.addEventListener('click', () => zoomToFeature(index));
+                    tbody.appendChild(tr);
                 });
-                
-                resultsTable.classList.remove('hidden');
-                noResultsMessage.classList.add('hidden');
+
+                table.classList.remove('hidden');
+                noMsg.classList.add('hidden');
             } else {
-                resultsTable.classList.add('hidden');
-                noResultsMessage.classList.remove('hidden');
+                table.classList.add('hidden');
+                noMsg.classList.remove('hidden');
             }
         }
 
         async function handleSearch() {
-            const queryInput = document.getElementById('query-input');
-            const query = queryInput.value.trim();
-            if (!query) {
-                showAlert("Please enter a query.");
-                return;
-            }
+            const inp   = document.getElementById('query-input');
+            const query = inp.value.trim();
+            if (!query) { showAlert("Please enter a query."); return; }
 
-            const searchButton = document.getElementById('search-button');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const resultsPanel = document.getElementById('results-panel');
-            const sqlQueryEl = document.getElementById('sql-query');
-            const sqlContentWrapper = document.getElementById('sql-content-wrapper');
-            const toggleSqlButton = document.getElementById('toggle-sql-button');
-            
-            if (sqlContentWrapper && !sqlContentWrapper.classList.contains('hidden')) {
-                sqlContentWrapper.classList.add('hidden');
-            }
-            if (toggleSqlButton) {
-                toggleSqlButton.textContent = 'Show Query';
-                isSqlVisible = false; 
-            }
+            const btn       = document.getElementById('search-button');
+            const spinner   = document.getElementById('loading-spinner');
+            const panel     = document.getElementById('results-panel');
+            const sqlEl     = document.getElementById('sql-query');
+            const sqlWrap   = document.getElementById('sql-content-wrapper');
+            const sqlToggle = document.getElementById('toggle-sql-button');
 
-            searchButton.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden');
-            resultsPanel.classList.add('hidden');
+            if (!sqlWrap.classList.contains('hidden')) sqlWrap.classList.add('hidden');
+            sqlToggle.textContent = 'Show Query';
+            isSqlVisible = false;
 
-            sqlQueryEl.textContent = 'Generating SQL...';
+            btn.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            panel.classList.add('hidden');
+            sqlEl.textContent = 'Generating SQL...';
 
             try {
-                const payload = { query: query, max_rows: 500 };
-                
-                const response = await fetch(`${SERVER_URL}/nl-to-map`, {
-                    method: 'POST',
+                const res = await fetch(`${SERVER_URL}/nl-to-map`, {
+                    method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                    signal: AbortSignal.timeout(120000) 
+                    body:    JSON.stringify({ query, max_rows: 500 }),
+                    signal:  AbortSignal.timeout(120000)
                 });
 
-                if (!response.ok) {
-                    const contentType = response.headers.get("content-type");
-                    let errorDetail = `HTTP error! Status: ${response.status}`;
-                    if (contentType && contentType.indexOf("application/json") !== -1) {
-                        const errorData = await response.json();
-                        errorDetail = errorData.detail || errorDetail;
+                if (!res.ok) {
+                    const ct = res.headers.get("content-type") || '';
+                    let detail = `HTTP error! Status: ${res.status}`;
+                    if (ct.includes("application/json")) {
+                        const errData = await res.json();
+                        detail = errData.detail || detail;
                     }
-                    throw new Error(errorDetail);
+                    throw new Error(detail);
                 }
 
-                const data = await response.json();
-                resultsPanel.classList.remove('hidden');
-                sqlQueryEl.textContent = data.sql || "No SQL query returned.";
-                
-                const geoJsonData = data.geo_json_features || data.map_html; 
+                const data = await res.json();
+                panel.classList.remove('hidden');
+                sqlEl.textContent = data.sql || "No SQL query returned.";
 
-                if (geoJsonData && geoJsonData.type === 'FeatureCollection') {
-                    drawGeoJsonFeatures(geoJsonData);
+                const geo = data.geo_json_features || data.map_html;
+                if (geo && geo.type === 'FeatureCollection') {
+                    drawGeoJsonFeatures(geo);
                 } else {
-                    showAlert("No map features found for this result. Showing initial map view.");
-                    if (!leafletMap) initMap(); 
+                    showAlert("No map features found for this result.");
                 }
-                
-                renderTabularResults(data); 
 
-            } catch (error) {
-                console.error('Fetch error:', error);
-                showAlert(`Error fetching data: ${error.message}. This is likely a timeout issue.`);
-                if (!leafletMap) initMap();
+                renderTabularResults(data);
+
+            } catch (err) {
+                console.error(err);
+                showAlert(`Error fetching data: ${err.message}. This is likely a timeout issue.`);
             } finally {
-                searchButton.classList.remove('hidden');
-                loadingSpinner.classList.add('hidden');
+                btn.classList.remove('hidden');
+                spinner.classList.add('hidden');
                 positionToggleButton();
             }
         }
-        
-        let isSqlVisible = false;
 
         function toggleSqlDisplay() {
-            const sqlContentWrapper = document.getElementById('sql-content-wrapper');
-            const toggleSqlButton = document.getElementById('toggle-sql-button');
-            
-            if (isSqlVisible) {
-                sqlContentWrapper.classList.add('hidden');
-                toggleSqlButton.textContent = 'Show Query';
-            } else {
-                sqlContentWrapper.classList.remove('hidden');
-                toggleSqlButton.textContent = 'Hide Query';
-            }
+            const wrap   = document.getElementById('sql-content-wrapper');
+            const toggle = document.getElementById('toggle-sql-button');
             isSqlVisible = !isSqlVisible;
+            wrap.classList.toggle('hidden', !isSqlVisible);
+            toggle.textContent = isSqlVisible ? 'Hide Query' : 'Show Query';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            initMap(); 
-            setPanelState(true); 
-            warmUpServer(); 
+            initMap();
+            setPanelState(true);
+            warmUpServer();
             positionToggleButton();
         });
 
-        window.addEventListener('resize', () => {
-            positionToggleButton();
-        });
+        window.addEventListener('resize', positionToggleButton);
 
         document.getElementById('search-button').addEventListener('click', handleSearch);
-        document.getElementById('query-input').addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') handleSearch();
+        document.getElementById('query-input').addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleSearch();
         });
-
         document.getElementById('ui-toggle-button').addEventListener('click', toggleUIPanel);
         document.getElementById('map-theme-toggle').addEventListener('change', toggleMapTheme);
-        
-        const toggleSqlButton = document.getElementById('toggle-sql-button');
-        if (toggleSqlButton) toggleSqlButton.addEventListener('click', toggleSqlDisplay);
-
+        document.getElementById('toggle-sql-button').addEventListener('click', toggleSqlDisplay);
     </script>
 </body>
 </html>
