@@ -53,7 +53,7 @@ Results are also shown in a table below the search panel. Clicking any row highl
 | Map rendering | [MapLibre GL JS 4.7.1](https://maplibre.org/) |
 | Map tiles | [MapTiler Streets v2](https://www.maptiler.com/) |
 | Frontend | HTML / Tailwind CSS / Vanilla JS |
-| Backend | FastAPI hosted on [Render](https://render.com/) |
+| Backend | FastAPI hosted on [Vercel](https://vercel.com/) |
 | NL → SQL | Google Gemini API |
 | Database | Supabase + PostGIS |
 | Hosting | [Netlify](https://www.netlify.com/) |
@@ -88,7 +88,7 @@ Selected features are highlighted in red using MapLibre's `feature-state` API.
 ## Known Limitations
 
 - **Mumbai only** — the database covers the Mumbai metropolitan region. Queries for other cities return no results.
-- **Cold start delay** — the backend runs on Render's free tier and sleeps after inactivity. The first query after a period of no use can take up to 90 seconds. The UI shows a warm-up indicator while waiting.
+- **Cold start delay** — the backend runs on Vercel's free tier and sleeps after inactivity. The first query after a period of no use can take up to 20 seconds. The UI shows a warm-up indicator while waiting.
 - **AI accuracy** — NL→SQL conversion may occasionally misinterpret ambiguous queries. The generated SQL is always visible in the UI so results can be verified.
 - **500 row cap** — results are limited to 500 features per query to keep rendering fast.
 
