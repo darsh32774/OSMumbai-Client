@@ -103,6 +103,7 @@
             #results-panel { max-height: calc(100vh - 200px); }
         }
 
+        /* ── MapLibre control & popup overrides ── */
         .maplibregl-popup-content {
             background: #1f2937;
             color: #e5e7eb;
@@ -146,9 +147,25 @@
                 </label>
             </div>
 
+            <!-- Speed / Accuracy mode selector -->
+            <div class="mb-4 p-2 bg-gray-700 rounded-md">
+                <p class="text-sm font-medium text-gray-300 mb-2">Query Mode</p>
+                <div class="flex rounded-md overflow-hidden border border-gray-600">
+                    <button id="mode-accuracy" onclick="setQueryMode('accuracy')"
+                        class="flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 bg-blue-600 text-white">
+                        🎯 Accuracy
+                    </button>
+                    <button id="mode-speed" onclick="setQueryMode('speed')"
+                        class="flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 bg-gray-600 text-gray-300 hover:bg-gray-500">
+                        ⚡ Speed
+                    </button>
+                </div>
+                <p id="mode-description" class="text-xs text-gray-400 mt-1.5">Uses a more powerful model for complex or ambiguous queries.</p>
+            </div>
+
             <p id="warmup-status" class="text-sm text-yellow-400 mb-4 flex items-center">
                 <span class="spinner w-4 h-4 mr-2 border-yellow-300 border-l-yellow-600"></span>
-                Warming up the server (Render free-tier cold start)...
+                Warming up the server (Vercel free-tier cold start)...
             </p>
             <p id="ready-status" class="text-sm text-gray-300 mb-4 hidden">
                 Use natural language to query OpenStreetMap data for the Mumbai region. 
@@ -205,24 +222,28 @@
     <script>
         const MAPTILER_KEY   = 'yBe4StW0eUtl8xuEUmSE';
         const SERVER_URL     = "https://osmumbai-server.vercel.app";
-        const INITIAL_CENTER = [72.8777, 19.0760];
+        const INITIAL_CENTER = [72.8777, 19.0760]; // [lng, lat]
         const INITIAL_ZOOM   = 10;
 
         const STYLE_LIGHT = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
         const STYLE_DARK  = `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`;
 
+        /* ─── STATE ─── */
         let mapInstance          = null;
         let currentGeoJson       = null;
         let isPanelOpen          = true;
         let isDarkMode           = false;
         let isSqlVisible         = false;
         let currentHighlightedId = null;
+        let queryMode            = 'accuracy'; // 'accuracy' | 'speed'
 
+        /* ─── FEATURE COLORS ─── */
         const COLOR_POINT   = '#3b82f6';
         const COLOR_LINE    = '#f59e0b';
         const COLOR_POLYGON = '#8b5cf6';
-        const COLOR_HL      = '#ef4444';
+        const COLOR_HL      = '#ef4444'; // highlight red
 
+        /* ─── TOAST ─── */
         function showAlert(message) {
             const toast = document.getElementById('toast-message');
             toast.textContent = message;
@@ -236,6 +257,27 @@
             }, 5000);
         }
 
+        /* ─── QUERY MODE ─── */
+        function setQueryMode(mode) {
+            queryMode = mode;
+            const accBtn  = document.getElementById('mode-accuracy');
+            const spdBtn  = document.getElementById('mode-speed');
+            const desc    = document.getElementById('mode-description');
+            const active  = 'bg-blue-600 text-white';
+            const inactive = 'bg-gray-600 text-gray-300 hover:bg-gray-500';
+
+            if (mode === 'accuracy') {
+                accBtn.className = `flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 ${active}`;
+                spdBtn.className = `flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 ${inactive}`;
+                desc.textContent = 'Uses a more powerful model for complex or ambiguous queries.';
+            } else {
+                spdBtn.className = `flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 ${active}`;
+                accBtn.className = `flex-1 py-1.5 text-sm font-semibold transition-colors duration-150 ${inactive}`;
+                desc.textContent = 'Uses a faster, lighter model. Best for simple, specific queries.';
+            }
+        }
+
+        /* ─── SERVER WARMUP ─── */
         function enableSearchInterface() {
             const inp = document.getElementById('query-input');
             const btn = document.getElementById('search-button');
@@ -247,25 +289,59 @@
             inp.focus();
         }
 
-        async function warmUpServer() {
+        // Attempt a single warmup ping. Returns true on success, false on failure.
+        async function pingServer() {
             try {
                 const res = await fetch(SERVER_URL + '/', {
                     method: 'GET',
-                    signal: AbortSignal.timeout(120000)
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(60000)
                 });
-                if (res.status < 200) throw new Error(`Status ${res.status}`);
-                console.log("Server warmed up.");
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    showAlert("Warning: Server is slow to wake up. Your first query might take up to 2 minutes.");
-                } else {
-                    showAlert("Warning: Server connection failed during warm-up. Try searching anyway.");
-                }
-            } finally {
-                enableSearchInterface();
+                return res.status >= 200 && res.status < 500;
+            } catch (_) {
+                return false;
             }
         }
 
+        // Retries up to MAX_RETRIES times with a delay between attempts.
+        // This fixes the issue where the first request silently fails on Render cold starts.
+        async function warmUpServer() {
+            const MAX_RETRIES = 4;
+            const RETRY_DELAY_MS = 5000;
+
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                console.log(`Warmup attempt ${attempt}/${MAX_RETRIES}...`);
+                const ok = await pingServer();
+                if (ok) {
+                    console.log("Server is ready.");
+                    enableSearchInterface();
+                    return;
+                }
+                if (attempt < MAX_RETRIES) {
+                    await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            }
+
+            // All retries exhausted — enable anyway so the user can still try
+            console.warn("Warmup failed after all retries. Enabling interface anyway.");
+            showAlert("Server may still be starting up. If your query fails, wait a moment and try again.");
+            enableSearchInterface();
+        }
+
+        // Re-ping when the user switches back to this tab after it was hidden.
+        // Covers the case where the page loaded in a background tab and the
+        // warmup request was throttled or dropped by the browser.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                const inp = document.getElementById('query-input');
+                if (inp && inp.disabled) {
+                    console.log("Tab became visible while server still warming — retrying warmup.");
+                    warmUpServer();
+                }
+            }
+        });
+
+        /* ─── PANEL TOGGLE ─── */
         function positionToggleButton() {
             const panel = document.getElementById('ui-panel');
             const btn   = document.getElementById('ui-toggle-button');
@@ -290,22 +366,15 @@
         function setPanelState(open) {
             const panel = document.getElementById('ui-panel');
             if (!panel) return;
-
             if (open) panel.classList.remove('panel-closed');
-            else panel.classList.add('panel-closed');
-
+            else      panel.classList.add('panel-closed');
             isPanelOpen = open;
-
-            const handler = () => {
-                positionToggleButton();
-                panel.removeEventListener('transitionend', handler);
-            };
-
-            panel.addEventListener('transitionend', handler);
+            positionToggleButton();
         }
 
         function toggleUIPanel() { setPanelState(!isPanelOpen); }
 
+        /* ─── MAP INIT ─── */
         function initMap() {
             if (mapInstance) return;
             mapInstance = new maplibregl.Map({
@@ -317,6 +386,7 @@
             mapInstance.addControl(new maplibregl.NavigationControl(), 'bottom-right');
         }
 
+        /* ─── MAP THEME ─── */
         function toggleMapTheme(e) {
             isDarkMode = e && e.target ? e.target.checked : !isDarkMode;
             document.getElementById('map-theme-label').textContent = isDarkMode ? 'Dark' : 'Light';
@@ -327,11 +397,13 @@
 
             const savedGeoJson = currentGeoJson;
             mapInstance.setStyle(isDarkMode ? STYLE_DARK : STYLE_LIGHT);
+            // Re-add GeoJSON layers after the style swap completes
             mapInstance.once('styledata', () => {
                 if (savedGeoJson) addLayers(savedGeoJson);
             });
         }
 
+        /* ─── POPUP HTML ─── */
         function buildPopupHtml(properties) {
             if (!properties) return '<em style="color:#9ca3af">No properties</em>';
             let html = '<strong>Feature Details</strong><br>';
@@ -343,6 +415,7 @@
             return html;
         }
 
+        /* ─── LAYER MANAGEMENT ─── */
         function removeLayers() {
             if (!mapInstance) return;
             ['query-points', 'query-lines', 'query-polygons', 'query-polygons-outline'].forEach(id => {
@@ -355,11 +428,13 @@
             if (!mapInstance) return;
             removeLayers();
 
+            // Clone and stamp each feature with a numeric id for feature-state
             const data = JSON.parse(JSON.stringify(geoJsonData));
             data.features.forEach((f, i) => { f.id = i; });
 
             mapInstance.addSource('query-results', { type: 'geojson', data });
 
+            // Polygon fill
             mapInstance.addLayer({
                 id: 'query-polygons', type: 'fill', source: 'query-results',
                 filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
@@ -369,6 +444,7 @@
                 }
             });
 
+            // Polygon outline
             mapInstance.addLayer({
                 id: 'query-polygons-outline', type: 'line', source: 'query-results',
                 filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
@@ -379,6 +455,7 @@
                 }
             });
 
+            // Lines
             mapInstance.addLayer({
                 id: 'query-lines', type: 'line', source: 'query-results',
                 filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
@@ -389,6 +466,7 @@
                 }
             });
 
+            // Points (circles — GPU-rendered, handles thousands of points smoothly)
             mapInstance.addLayer({
                 id: 'query-points', type: 'circle', source: 'query-results',
                 filter: ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
@@ -401,6 +479,7 @@
                 }
             });
 
+            // Click popups + cursor change on interactive layers
             ['query-points', 'query-lines', 'query-polygons'].forEach(layerId => {
                 mapInstance.on('click', layerId, (e) => {
                     const feature = e.features?.[0];
@@ -418,6 +497,7 @@
             });
         }
 
+        /* ─── BOUNDS HELPER ─── */
         function featureBounds(feature) {
             const bounds = new maplibregl.LngLatBounds();
             const geom   = feature.geometry;
@@ -435,6 +515,7 @@
             return bounds.isEmpty() ? null : bounds;
         }
 
+        /* ─── DRAW ALL FEATURES ─── */
         function drawGeoJsonFeatures(geoJsonData) {
             if (!mapInstance) return;
             currentGeoJson       = geoJsonData;
@@ -449,6 +530,7 @@
                 addLayers(geoJsonData);
             }
 
+            // Fit the camera to all returned features
             try {
                 const all = new maplibregl.LngLatBounds();
                 features.forEach(f => {
@@ -459,14 +541,17 @@
             } catch(e) { console.error("fitBounds error:", e); }
         }
 
+        /* ─── ZOOM TO SINGLE FEATURE (table row click) ─── */
         function zoomToFeature(featureIndex) {
             if (!mapInstance || !currentGeoJson) return;
             const feature = currentGeoJson.features[featureIndex];
             if (!feature) { showAlert("Cannot find map feature for this row."); return; }
 
+            // Clear old highlight
             if (currentHighlightedId !== null) {
                 try { mapInstance.setFeatureState({ source: 'query-results', id: currentHighlightedId }, { highlighted: false }); } catch(_) {}
             }
+            // Apply new highlight
             try { mapInstance.setFeatureState({ source: 'query-results', id: featureIndex }, { highlighted: true }); } catch(_) {}
             currentHighlightedId = featureIndex;
 
@@ -497,6 +582,7 @@
             }
         }
 
+        /* ─── RENDER TABLE ─── */
         function renderTabularResults(data) {
             const countEl = document.getElementById('results-count');
             const thead   = document.getElementById('table-head');
@@ -539,6 +625,7 @@
             }
         }
 
+        /* ─── SEARCH ─── */
         async function handleSearch() {
             const inp   = document.getElementById('query-input');
             const query = inp.value.trim();
@@ -564,7 +651,7 @@
                 const res = await fetch(`${SERVER_URL}/nl-to-map`, {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ query, max_rows: 500 }),
+                    body:    JSON.stringify({ query, max_rows: 500, mode: queryMode }),
                     signal:  AbortSignal.timeout(120000)
                 });
 
@@ -601,6 +688,7 @@
             }
         }
 
+        /* ─── SQL TOGGLE ─── */
         function toggleSqlDisplay() {
             const wrap   = document.getElementById('sql-content-wrapper');
             const toggle = document.getElementById('toggle-sql-button');
@@ -609,6 +697,7 @@
             toggle.textContent = isSqlVisible ? 'Hide Query' : 'Show Query';
         }
 
+        /* ─── BOOT ─── */
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
             setPanelState(true);
